@@ -22,4 +22,5 @@ const windowSchema = new Schema({
   currentChromeId: {type: String, required: true}
 })
 
-export const WindowsModel = mongoose.model('WindowsModel', windowSchema)
+const WindowsModel = mongoose.model('WindowsModel', windowSchema)
+module.exports = WindowsModel
