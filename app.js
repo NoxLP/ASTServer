@@ -7,5 +7,5 @@ const mongoose = require('mongoose')
 
 app
   .get('/windows', (req, res, next) => {
-    
+
   })
