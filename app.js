@@ -13,22 +13,54 @@ const app = express()
 const bodyParser = require('body-parser')
 app.use(bodyParser.json())
 
-//get all windows
-app.get('/windows', (req, res, next) => {
-  console.log('\nRequested all windows through "get/windows"')
+const buildSearchWindowByUrlsObject = body => {
+  return {
+    $and: [
+      {
+        tabs: { $size: body.length }
+      },
+      {
+        "tabs.url": { $all: body }
+      }
+    ]
+  }
+}
 
-  WindowsModel.find({})
-    .then(resp => {
-      console.log('Found all windows in db', resp)
+app
+  //get all windows
+  .get('/windows', (req, res, next) => {
+    console.log('\nRequested all windows through "get/windows"')
 
-      res.json(resp)
-    })
-    .catch(err => {
-      console.error(`Error when trying to respond to "get/windows":\n${err}`)
-    })
-})
+    WindowsModel.find({})
+      .then(resp => {
+        console.log('Found all windows in db', resp)
 
-app 
+        res.json(resp)
+      })
+      .catch(err => {
+        console.error(`Error when trying to respond to "get/windows":\n${err}`)
+      })
+  })
+  //find window with current tabs
+  .get('/windowByURLs', (req, res, next) => {
+    console.log('\nRequested window with tabs with URLs', req.body)
+
+    WindowsModel.find(buildSearchWindowByUrlsObject(req.body))
+      .then(resp => {
+        console.log('found window')
+
+        res.status(200)
+        res.send("Found window")
+      })
+      .catch(err => {
+        console.error('Not found window')
+
+        res.status(404)
+        res.send('Not found window')
+      })
+  })
+
+app
   //new window
   .post('/window', (req, res, next) => {
     console.log('\nPosted new window ', req.body)
@@ -50,12 +82,12 @@ app
 
     let foundWindows = await WindowsModel.find(req.query)
     console.log('found windows ', foundWindows)
-    if(foundWindows.length === 0) {
+    if (foundWindows.length === 0) {
       console.log('No window found with the given parameters')
 
       res.status(404)
       res.send('No window found with the given parameters')
-    } else if(foundWindows.length > 1) {
+    } else if (foundWindows.length > 1) {
       console.error('Found multiple windows with given criteria')
 
       res.status(400)
