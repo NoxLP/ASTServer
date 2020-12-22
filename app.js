@@ -244,19 +244,20 @@ app
     console.log('\nRequested delete window', req.query)
 
     WindowsModel.deleteOne(req.query)
-    .then(resp => {
-      console.log('Window removed')
+      .then(resp => {
+        console.log('Window removed')
 
-      res.sendStatus(200)
-    })
-    .catch(err => {
-      console.log(`Error removing window:\n${err}`)
-      
-      res.status(400)
-      res.send(`Error removing window:\n${err}`)
-    })
+        res.sendStatus(200)
+      })
+      .catch(err => {
+        console.log(`Error removing window:\n${err}`)
+        
+        res.status(400)
+        res.send(`Error removing window:\n${err}`)
+      })
   })
 //#endregion
+
 app.listen(3000, () => {
   console.log('Server started at port 3000')
 })
