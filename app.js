@@ -63,6 +63,24 @@ app
         console.error(`Error when trying to respond to "get/windows":\n${err}`)
       })
   })
+  //get window
+  .get('/window', (req, res, next) => {
+    console.log('\nRequested window with chrome id', req.query)
+
+    WindowsModel.find(req.query)
+      .then(resp => {
+        console.log('found window ', resp)
+
+        res.status(200)
+        res.json(resp)
+      })
+      .catch(err => {
+        console.error('Not found window')
+
+        res.status(404)
+        res.send('Not found window')
+      })
+  })
   //find window with current tabs
   .get('/windowByURLs', (req, res, next) => {
     console.log('\nRequested window with tabs with URLs', req.body)
