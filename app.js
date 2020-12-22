@@ -93,10 +93,10 @@ app
           res.status(400)
           res.send(`Found multiple windows with given criteria`)
         } else {
-          console.log('found window ', resp[0]._id)
+          console.log('found window ', resp[0])
 
           res.status(200)
-          res.send(resp[0]._id)
+          res.send(resp[0])
         }
       })
       .catch(err => {
