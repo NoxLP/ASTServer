@@ -5,26 +5,27 @@ mongoose.connect('mongodb://127.0.0.1:27017/alwSaveTabs', { useNewUrlParser: tru
   }).catch(err => {
     console.error('Error connecting to mongo!', err);
   })
+mongoose.Schema.Types.String.checkRequired(v => v != null);
 
 const WindowsModel = require('./model/model')
 
 const express = require('express')
-const app = express()
+const cors = require('cors')
 const bodyParser = require('body-parser')
+const app = express()
 app.use(bodyParser.json())
+app.use(cors())
 
 //#region helpers
 const resolveFindWindow = (res, foundWindows, okCallback) => {
   if (foundWindows.length === 0) {
     console.log('No window found with the given parameters')
 
-    res.status(404)
-    res.send('No window found with the given parameters')
+    res.status(404).send('No window found with the given parameters')
   } else if (foundWindows.length > 1) {
     console.error('Found multiple windows with given criteria')
 
-    res.status(400)
-    res.send(`Found multiple windows with given criteria`)
+    res.status(400).send(`Found multiple windows with given criteria`)
   } else {
     okCallback()
   }
@@ -82,10 +83,17 @@ app
       })
   })
   //find window with current tabs
-  .get('/windowByURLs', (req, res, next) => {
+  .get('/windowByURLs', async (req, res, next) => {
     console.log('\nRequested window with tabs with URLs', req.body)
 
-    WindowsModel.find(req.body)
+    let foundWindows = await WindowsModel.find(req.body)
+    resolveFindWindow(res, foundWindows, () => {
+      console.log('found window ', foundWindows[0])
+
+      res.status(200)
+      res.json(foundWindows[0])
+    })
+    /*WindowsModel.find(req.body)
       .then(resp => {
         if (resp.length > 1) {
           console.error('Found multiple windows with given criteria')
@@ -93,7 +101,7 @@ app
           res.status(400)
           res.send(`Found multiple windows with given criteria`)
         } else {
-          console.log('found window ', resp[0])
+          console.log('found window ', resp)
 
           res.status(200)
           res.send(resp[0])
@@ -104,7 +112,7 @@ app
 
         res.status(404)
         res.send('Not found window')
-      })
+      })*/
   })
 //#endregion
 
@@ -226,7 +234,7 @@ app
       if(notFoundTabs.length === 0) {
         res.sendStatus(200)
       } else {
-        res.status(200)
+        res.status(400)
         res.json({'notFoundTabs': notFoundTabs})
       }
     })
