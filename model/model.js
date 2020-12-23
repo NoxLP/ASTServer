@@ -3,7 +3,7 @@ const Schema = mongoose.Schema
 
 const tabSchema = new Schema({
   url: {type: String, required: true},
-  tabId: {type: String, required: true},
+  tabId: {type: Number, required: true},
   title: {type: String, required: true},
   muted: {type: Boolean, required: true},
   pinned: {type: Boolean, required: true},

@@ -32,12 +32,12 @@ const resolveFindWindow = (res, foundWindows, okCallback) => {
 }
 const resolveFindTabInWindow = (res, myWindow, tabId, okCallback) => {
   let tabIndex;
-
+  
   if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === tabId)) === -1) {
-    console.error('No tab found with the given parameters')
+    console.error('No tab found with the given parameters: ', tabId)
 
     res.status(404)
-    res.send('No tab found with the given parameters')
+    res.send(`No tab found with the given parameters: ${tabId}`)
   } else {
     okCallback(tabIndex)
   }
