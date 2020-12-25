@@ -15,5 +15,5 @@ const windowSchema = new Schema({
   creationDate: {type: Date, required: true}
 })
 
-const WindowsModel = mongoose.model('WindowsModel', windowSchema)
+const WindowsModel = mongoose.model('windows', windowSchema)
 module.exports = WindowsModel

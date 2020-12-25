@@ -16,8 +16,11 @@ const app = express()
 app.use(bodyParser.json())
 app.use(cors())
 
+const TransactionsQueue = require('./BDTransactionsQueue')
+
 //#region helpers
 const resolveFindWindow = (res, foundWindows, okCallback) => {
+  console.log(foundWindows.map(x => x.currentChromeId).join('\n'))
   if (foundWindows.length === 0) {
     console.log('No window found with the given parameters')
 
@@ -32,7 +35,13 @@ const resolveFindWindow = (res, foundWindows, okCallback) => {
 }
 const resolveFindTabInWindow = (res, myWindow, tabId, okCallback) => {
   let tabIndex;
-  
+  //console.log(myWindow.tabs)
+  console.log(tabId)
+  for(let i=0;i<myWindow.tabs.length;i++) {
+    console.log("\n"+myWindow.tabs[i].tabId)
+    if(myWindow.tabs[i].tabId === tabId)
+      console.log("\n*************** OK")
+  }
   if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === tabId)) === -1) {
     console.error('No tab found with the given parameters: ', tabId)
 
@@ -54,65 +63,37 @@ app
   .get('/windows', (req, res, next) => {
     console.log('\nRequested all windows through "get/windows"')
 
-    WindowsModel.find({})
-      .then(resp => {
-        console.log('Found all windows in db', resp)
+    TransactionsQueue.addTransaction(() => 
+      WindowsModel.find({})
+        .then(resp => {
+          console.log('Found all windows in db', resp)
 
-        res.json(resp)
-      })
-      .catch(err => {
-        console.error(`Error when trying to respond to "get/windows":\n${err}`)
-      })
+          res.json(resp)
+        })
+        .catch(err => {
+          console.error(`Error when trying to respond to "get/windows":\n${err}`)
+        })
+    )
   })
   //get window
   .get('/window', (req, res, next) => {
     console.log('\nRequested window with chrome id', req.query)
 
-    WindowsModel.find(req.query)
-      .then(resp => {
-        console.log('found window ', resp)
-
-        res.status(200)
-        res.json(resp)
-      })
-      .catch(err => {
-        console.error('Not found window')
-
-        res.status(404)
-        res.send('Not found window')
-      })
-  })
-  //find window with current tabs
-  .get('/windowByURLs', async (req, res, next) => {
-    console.log('\nRequested window with tabs with URLs', req.body)
-
-    let foundWindows = await WindowsModel.find(req.body)
-    resolveFindWindow(res, foundWindows, () => {
-      console.log('found window ', foundWindows[0])
-
-      res.status(200)
-      res.json(foundWindows[0])
-    })
-    /*WindowsModel.find(req.body)
-      .then(resp => {
-        if (resp.length > 1) {
-          console.error('Found multiple windows with given criteria')
-    
-          res.status(400)
-          res.send(`Found multiple windows with given criteria`)
-        } else {
+    TransactionsQueue.addTransaction(() => 
+      WindowsModel.find(req.query)
+        .then(resp => {
           console.log('found window ', resp)
 
           res.status(200)
-          res.send(resp[0])
-        }
-      })
-      .catch(err => {
-        console.error('Not found window')
+          res.json(resp)
+        })
+        .catch(err => {
+          console.error('Not found window')
 
-        res.status(404)
-        res.send('Not found window')
-      })*/
+          res.status(404)
+          res.send('Not found window')
+        })
+    )
   })
 //#endregion
 
@@ -164,6 +145,23 @@ app
         })
     })
   })
+  /*
+  find window with current tabs => this endpoint use POST verb because all the urls of all tabs of the window are needed, they could just exceed the url max length so they can 
+  NOT be passed as query params, therefore the body is needed to pass all tab's urls as an object and axios doesn't allow body in GET requests
+  */
+  .post('/windowByURLs', async (req, res, next) => {
+    console.log('\nRequested window with tabs with URLs', req.body)
+
+    TransactionsQueue.addTransaction(async () => {
+      let foundWindows = await WindowsModel.find(req.body)
+      resolveFindWindow(res, foundWindows, () => {
+        console.log('found window ', foundWindows[0])
+
+        res.status(200)
+        res.json(foundWindows[0])
+      })
+    })
+  })
 //#endregion
 
 //#region patch
@@ -175,22 +173,24 @@ app
   .patch('/tab', async (req, res, next) => {
     console.log('\nRequested update tab', req.query)
 
-    let foundWindows = await WindowsModel.find(req.query)
-    console.log('found windows ', foundWindows)
-    //res.json(foundWindows)
-    resolveFindWindow(res, foundWindows, () => {
-      let myWindow = foundWindows[0]
-      resolveFindTabInWindow(res, myWindow, req.body[0], tabIndex => {
-        console.log('Updating tab')
+    TransactionsQueue.addTransaction(async () => {
+      let foundWindows = await WindowsModel.find(req.query)
+      console.log('found windows ', foundWindows)
+      //res.json(foundWindows)
+      resolveFindWindow(res, foundWindows, () => {
+        let myWindow = foundWindows[0]
+        resolveFindTabInWindow(res, myWindow, parseInt(req.body[0]), tabIndex => {
+          console.log('Updating tab')
 
-        let tab = myWindow.tabs[tabIndex]
-        let updateObject = req.body[1];
-        for(let prop in updateObject) {
-          tab[prop] = updateObject[prop]
-        }
+          let tab = myWindow.tabs[tabIndex]
+          let updateObject = req.body[1];
+          for(let prop in updateObject) {
+            tab[prop] = updateObject[prop]
+          }
 
-        myWindow.save()
-        res.sendStatus(200)
+          myWindow.save()
+          res.sendStatus(200)
+        })
       })
     })
   })
@@ -198,45 +198,49 @@ app
   .patch('/windowChromeId', (req, res, next) => {
     console.log('\nRequested update window chrome id')
 
-    WindowsModel.findOneAndUpdate(req.query._id, req.body)
-      .then(resp => {
-        console.log('Updated chrome id')
+    TransactionsQueue.addTransaction(() => 
+      WindowsModel.findOneAndUpdate(req.query._id, req.body)
+        .then(resp => {
+          console.log('Updated chrome id')
 
-        res.sendStatus(200)
-      })
-      .catch(err => {
-        console.log(`Error updating window chrome id:\n${err}`)
-        
-        res.status(400)
-        res.send(`Error updating window chrome id:\n${err}`)
-      })
+          res.sendStatus(200)
+        })
+        .catch(err => {
+          console.log(`Error updating window chrome id:\n${err}`)
+          
+          res.status(400)
+          res.send(`Error updating window chrome id:\n${err}`)
+        })
+    )
   })
   //PATCH all window tabs ids
   .patch('/tabsIds', async (req, res, next) => {
     console.log("\nRequested update all window's tabs", req.query)
 
-    let foundWindows = await WindowsModel.find(req.query)
-    console.log('found windows ', foundWindows)
+    TransactionsQueue.addTransaction(async () => {
+      let foundWindows = await WindowsModel.find(req.query)
+      console.log('found windows ', foundWindows)
 
-    resolveFindWindow(res, foundWindows, () => {
-      console.log('window found')
+      resolveFindWindow(res, foundWindows, () => {
+        console.log('window found')
 
-      let notFoundTabs = [], myWindow = foundWindows[0]
+        let notFoundTabs = [], myWindow = foundWindows[0]
 
-      for(let prop in req.body) {
-        let tabIndex;
-        if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === prop)) !== -1)
-          myWindow.tabs[tabIndex].tabId = req.body[prop]
-        else
-          notFoundTabs.push(prop)
-      }
+        for(let prop in req.body) {
+          let tabIndex;
+          if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === prop)) !== -1)
+            myWindow.tabs[tabIndex].tabId = req.body[prop]
+          else
+            notFoundTabs.push(prop)
+        }
 
-      if(notFoundTabs.length === 0) {
-        res.sendStatus(200)
-      } else {
-        res.status(400)
-        res.json({'notFoundTabs': notFoundTabs})
-      }
+        if(notFoundTabs.length === 0) {
+          res.sendStatus(200)
+        } else {
+          res.status(200)
+          res.json({'notFoundTabs': notFoundTabs})
+        }
+      })
     })
   })
 //#endregion
@@ -250,18 +254,20 @@ app
   .delete('/tab', async (req, res, next) => {
     console.log('\nRequested delete tab', req.query)
 
-    let foundWindows = await WindowsModel.find({currentChromeId: req.query.currentChromeId})
-    console.log('found windows ', foundWindows)
-    //res.json(foundWindows)
-    resolveFindWindow(res, foundWindows, () => {
-      console.log('found window')
-      let myWindow = foundWindows[0]
-      resolveFindTabInWindow(res, myWindow, req.query.tabId, tabIndex => {
-        console.log('deleting tab')
-        myWindow.tabs.splice(tabIndex, 1)
-        myWindow.save()
+    TransactionsQueue.addTransaction(async () => {
+      let foundWindows = await WindowsModel.find({currentChromeId: req.query.currentChromeId})
+      //console.log('found windows ', foundWindows)
+      //res.json(foundWindows)
+      resolveFindWindow(res, foundWindows, () => {
+        console.log('found window')
+        let myWindow = foundWindows[0]
+        resolveFindTabInWindow(res, myWindow, parseInt(req.query.tabId), tabIndex => {
+          console.log('deleting tab')
+          myWindow.tabs.splice(tabIndex, 1)
+          myWindow.save()
 
-        res.sendStatus(200)
+          res.sendStatus(200)
+        })
       })
     })
   })
@@ -269,18 +275,20 @@ app
   .delete('/window', (req, res, next) => {
     console.log('\nRequested delete window', req.query)
 
-    WindowsModel.deleteOne(req.query)
-      .then(resp => {
-        console.log('Window removed')
+    TransactionsQueue.addTransaction(() => 
+      WindowsModel.deleteOne(req.query)
+        .then(resp => {
+          console.log('Window removed')
 
-        res.sendStatus(200)
-      })
-      .catch(err => {
-        console.log(`Error removing window:\n${err}`)
-        
-        res.status(400)
-        res.send(`Error removing window:\n${err}`)
-      })
+          res.sendStatus(200)
+        })
+        .catch(err => {
+          console.log(`Error removing window:\n${err}`)
+          
+          res.status(400)
+          res.send(`Error removing window:\n${err}`)
+        })
+    )
   })
 //#endregion
 
