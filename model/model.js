@@ -12,7 +12,8 @@ const tabSchema = new Schema({
 const windowSchema = new Schema({
   tabs: {type: [tabSchema], required: true},
   currentChromeId: {type: String, required: true},
-  creationDate: {type: Date, required: true}
+  creationDate: {type: Date, required: true},
+  title: String
 })
 
 const WindowsModel = mongoose.model('windows', windowSchema)

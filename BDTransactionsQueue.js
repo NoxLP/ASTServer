@@ -16,6 +16,10 @@ class BDTransactionsQueue {
 
         this._transactionsLoop()
       })
+      .catch(err => {
+        //************************* TODO ******************************
+        
+      })
   }
   addTransaction(transaction) {
     this.transactionsQueue.push(transaction)
