@@ -1,5 +1,5 @@
 const mongoose = require('mongoose')
-mongoose.connect('mongodb://127.0.0.1:27017/alwSaveTabs', { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false })
+mongoose.connect('mongodb://127.0.0.1:27017/SaveTabs', { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false })
   .then(() => {
     console.log('Connected to Mongo!');
   }).catch(err => {
@@ -242,6 +242,25 @@ app
         }
       })
     })
+  })
+  //PATCH window title
+  .patch('/windowTitle', (req, res, next) => {
+    console.log('\nRequested update window title', req.query)
+
+    TransactionsQueue.addTransaction(() => 
+      WindowsModel.findOneAndUpdate(req.query, req.body)
+        .then(resp => {
+          console.log('Updated window title')
+
+          res.sendStatus(200)
+        })
+        .catch(err => {
+          console.log(`Error updating window title:\n${err}`)
+          
+          res.status(400)
+          res.send(`Error updating window title:\n${err}`)
+        })
+    )
   })
 //#endregion
 
