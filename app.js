@@ -16,7 +16,9 @@ const app = express()
 app.use(bodyParser.json())
 app.use(cors())
 
-const TransactionsQueue = require('./BDTransactionsQueue')
+const TransactionsQueue = require('./BDTransactionsQueue');
+const { transactionsQueue } = require('./BDTransactionsQueue');
+const { json } = require('body-parser');
 
 //#region helpers
 const resolveFindWindow = (res, foundWindows, okCallback) => {
@@ -37,12 +39,12 @@ const resolveFindTabInWindow = (res, myWindow, tabId, okCallback) => {
   let tabIndex;
   //console.log(myWindow.tabs)
   console.log(tabId)
-  for(let i=0;i<myWindow.tabs.length;i++) {
-    console.log("\n"+myWindow.tabs[i].tabId)
-    if(myWindow.tabs[i].tabId === tabId)
+  for (let i = 0; i < myWindow.tabs.length; i++) {
+    console.log("\n" + myWindow.tabs[i].tabId)
+    if (myWindow.tabs[i].tabId === tabId)
       console.log("\n*************** OK")
   }
-  if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === tabId)) === -1) {
+  if ((tabIndex = myWindow.tabs.findIndex(x => x.tabId === tabId)) === -1) {
     console.error('No tab found with the given parameters: ', tabId)
 
     res.status(404)
@@ -63,7 +65,7 @@ app
   .get('/windows', (req, res, next) => {
     console.log('\nRequested all windows through "get/windows"')
 
-    TransactionsQueue.addTransaction(() => 
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.find({})
         .then(resp => {
           console.log('Found all windows in db', resp)
@@ -79,7 +81,7 @@ app
   .get('/window', (req, res, next) => {
     console.log('\nRequested window with chrome id', req.query)
 
-    TransactionsQueue.addTransaction(() => 
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.find(req.query)
         .then(resp => {
           console.log('found window ', resp)
@@ -154,12 +156,41 @@ app
 
     TransactionsQueue.addTransaction(async () => {
       let foundWindows = await WindowsModel.find(req.body)
+      console.log('found windows ', foundWindows)
       resolveFindWindow(res, foundWindows, () => {
         console.log('found window ', foundWindows[0])
 
         res.status(200)
         res.json(foundWindows[0])
       })
+    })
+  })
+  /*
+  get tabs by their ids => this endpoint use POST verb because the ids of all the tabs are needed, they could just exceed the url max length so they can 
+  NOT be passed as query params, therefore the body is needed to pass all tab's urls as an object and axios doesn't allow body in GET requests
+  */
+  .post('/tabsByIds', (req, res, next) => {
+    console.log('\nRequested tabs by ids', req.body)
+
+    TransactionsQueue.addTransaction(() => {
+      let ids = JSON.stringify(req.body)
+      console.log(ids)
+      WindowsModel.aggregate()
+        .match({ 'tabs.tabId': { '$in': req.body } })
+        .unwind('$tabs')
+        .match({ 'tabs.tabId': { '$in': req.body } })
+        .group({_id:'', 'tabs': { '$push': '$tabs' }})
+        .then(resp => {
+          console.log('done tabs by ids: ', resp)
+
+          res.json(resp[0].tabs)
+        })
+        .catch(err => {
+          console.log('error retrieving tabs by ids: ', err)
+
+          res.status(500)
+          res.send(`error retrieving tabs by ids: ${err}`)
+        })
     })
   })
 //#endregion
@@ -184,7 +215,7 @@ app
 
           let tab = myWindow.tabs[tabIndex]
           let updateObject = req.body[1];
-          for(let prop in updateObject) {
+          for (let prop in updateObject) {
             tab[prop] = updateObject[prop]
           }
 
@@ -198,7 +229,7 @@ app
   .patch('/windowChromeId', (req, res, next) => {
     console.log('\nRequested update window chrome id')
 
-    TransactionsQueue.addTransaction(() => 
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.findOneAndUpdate(req.query._id, req.body)
         .then(resp => {
           console.log('Updated chrome id')
@@ -207,7 +238,7 @@ app
         })
         .catch(err => {
           console.log(`Error updating window chrome id:\n${err}`)
-          
+
           res.status(400)
           res.send(`Error updating window chrome id:\n${err}`)
         })
@@ -226,19 +257,19 @@ app
 
         let notFoundTabs = [], myWindow = foundWindows[0]
 
-        for(let prop in req.body) {
+        for (let prop in req.body) {
           let tabIndex;
-          if((tabIndex = myWindow.tabs.findIndex(x => x.tabId === prop)) !== -1)
+          if ((tabIndex = myWindow.tabs.findIndex(x => x.tabId === prop)) !== -1)
             myWindow.tabs[tabIndex].tabId = req.body[prop]
           else
             notFoundTabs.push(prop)
         }
 
-        if(notFoundTabs.length === 0) {
+        if (notFoundTabs.length === 0) {
           res.sendStatus(200)
         } else {
           res.status(200)
-          res.json({'notFoundTabs': notFoundTabs})
+          res.json({ 'notFoundTabs': notFoundTabs })
         }
       })
     })
@@ -247,7 +278,7 @@ app
   .patch('/windowTitle', (req, res, next) => {
     console.log('\nRequested update window title', req.query)
 
-    TransactionsQueue.addTransaction(() => 
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.findOneAndUpdate(req.query, req.body)
         .then(resp => {
           console.log('Updated window title')
@@ -256,7 +287,7 @@ app
         })
         .catch(err => {
           console.log(`Error updating window title:\n${err}`)
-          
+
           res.status(400)
           res.send(`Error updating window title:\n${err}`)
         })
@@ -274,7 +305,7 @@ app
     console.log('\nRequested delete tab', req.query)
 
     TransactionsQueue.addTransaction(async () => {
-      let foundWindows = await WindowsModel.find({currentChromeId: req.query.currentChromeId})
+      let foundWindows = await WindowsModel.find({ currentChromeId: req.query.currentChromeId })
       //console.log('found windows ', foundWindows)
       //res.json(foundWindows)
       resolveFindWindow(res, foundWindows, () => {
@@ -294,7 +325,7 @@ app
   .delete('/window', (req, res, next) => {
     console.log('\nRequested delete window', req.query)
 
-    TransactionsQueue.addTransaction(() => 
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.deleteOne(req.query)
         .then(resp => {
           console.log('Window removed')
@@ -303,7 +334,7 @@ app
         })
         .catch(err => {
           console.log(`Error removing window:\n${err}`)
-          
+
           res.status(400)
           res.send(`Error removing window:\n${err}`)
         })
