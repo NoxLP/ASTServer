@@ -172,9 +172,7 @@ app
   .post('/tabsByIds', (req, res, next) => {
     console.log('\nRequested tabs by ids', req.body)
 
-    TransactionsQueue.addTransaction(() => {
-      let ids = JSON.stringify(req.body)
-      console.log(ids)
+    TransactionsQueue.addTransaction(() =>
       WindowsModel.aggregate()
         .match({ 'tabs.tabId': { '$in': req.body } })
         .unwind('$tabs')
@@ -191,7 +189,7 @@ app
           res.status(500)
           res.send(`error retrieving tabs by ids: ${err}`)
         })
-    })
+    )
   })
 //#endregion
 
