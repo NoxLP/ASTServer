@@ -177,7 +177,7 @@ app
         .match({ 'tabs.tabId': { '$in': req.body } })
         .unwind('$tabs')
         .match({ 'tabs.tabId': { '$in': req.body } })
-        .group({_id:'', 'tabs': { '$push': '$tabs' }})
+        .group({ _id: '', 'tabs': { '$push': '$tabs' } })
         .then(resp => {
           console.log('done tabs by ids: ', resp)
 
@@ -335,6 +335,27 @@ app
 
           res.status(400)
           res.send(`Error removing window:\n${err}`)
+        })
+    )
+  })
+  //DELETE tabs by ids
+  .delete('/tabsByIds', (req, res, next) => {
+    console.log('Delete tabs by ids ', req.body)
+    TransactionsQueue.addTransaction(() =>
+      WindowsModel.updateMany(
+        {},
+        { $pull: { tabs: { tabId: { $in: req.body } } } }
+        )
+        .then(resp => {
+          console.log('done deleting tabs by ids')
+
+          res.sendStatus(200)
+        })
+        .catch(err => {
+          console.log('error delenting tabs by ids ', err)
+
+          res.status(500)
+          res.send(`error delenting tabs by ids: ${err}`)
         })
     )
   })
